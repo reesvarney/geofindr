@@ -37,6 +37,7 @@ app.get('/start_game', (req, res)=>{
 });
 
 // USAGE: /preview?game_id=[GAME ID]
+// /preview?<game_id>
 // Returns static image of finish position
 app.get('/preview', async(req, res)=>{
   const pos = games[req.query.game_id].finish;
