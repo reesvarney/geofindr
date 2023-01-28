@@ -60,7 +60,7 @@ fn start_game(user_id: String) -> Json<GameStartResponse> {
     // For the second position, get random from list and then check if it is within the min/ max distance, if not - go to next item in list
     // Also make sure it is not the same coordinates as the first position
     let positions = TEST_POSITIONS;
-    let mut _games = GAMES.lock().unwrap();
+    let mut _games = GAMES.lock().expect("Error acquiring lock on GAMES");
     let data = GameData {
         coordinates: positions,
         start_time: SystemTime::now(),
@@ -79,13 +79,13 @@ async fn check_position(lat: f64, lng: f64, game_id: String) -> String {
     let distance: f64 = haversine_distance(Coordinates { lat, lng }, get_coordinates(game_id.clone()));
     if distance < 20.0 {
         let data = get_game_data(game_id);
-        let time_taken = data.start_time.elapsed().ok().unwrap().as_secs();
+        let time_taken = data.start_time.elapsed().ok().expect("Error sending a time result").as_secs();
         let user = data.user_id.to_string();
-        let start_pos = json::to_string(&data.coordinates[0]).unwrap();
-        let end_pos = json::to_string(&data.coordinates[1]).unwrap();
+        let start_pos = json::to_string(&data.coordinates[0]).expect("Error sending a start_pos result");
+        let end_pos = json::to_string(&data.coordinates[1]).expect("Error sending an end_pos result");
         let url = format!("https://docs.google.com/forms/d/e/1FAIpQLSdMCNxP4QEmAjuFwQYAZ678P19u08BN0lCvhJffeK4JH5XyYg/formResponse?submit=Submit&usp=pp_url&entry.910322073={user}&entry.1918876988={time_taken}&entry.1744420129={start_pos}&entry.209514963={end_pos}");
         println!("{}", url);
-        let resp = reqwest::get(url).await.ok().unwrap();
+        let resp = reqwest::get(url).await.ok().expect("Error requesting a google forms url");
         if resp.status().is_success() {
             println!("success!");
         } else if resp.status().is_server_error() {
@@ -117,7 +117,7 @@ async fn preview(game_id: String) -> Option<NamedFile> {
 // The lock method is required and stops other parts of the code interacting with the variable
 // It only becomes "unlocked" at the end of its scope which is why it needs to be used through a separate function
 fn get_coordinates(game_id: String) -> Coordinates {
-    let mut _games = GAMES.lock().unwrap();
+    let mut _games = GAMES.lock().expect("Error locking coordinates into games list");
     let lat = _games[&game_id].coordinates[1].lat.clone();
     let lng = _games[&game_id].coordinates[1].lng.clone();
     return Coordinates { lat, lng };
@@ -125,7 +125,7 @@ fn get_coordinates(game_id: String) -> Coordinates {
 
 // Same but for all game data
 fn get_game_data(game_id: String) -> GameData {
-    let mut _games = GAMES.lock().unwrap();
+    let mut _games = GAMES.lock().expect("Error locking game id into games list");
     return _games[&game_id].clone();
 }
 
