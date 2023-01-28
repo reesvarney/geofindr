@@ -72,7 +72,6 @@ fn start_game(user_id: String) -> Json<GameStartResponse> {
         game_id: id,
     });
 }
-use reqwest::header::USER_AGENT;
 
 // Check position distance
 #[get("/check_position?<lat>&<lng>&<game_id>")]
@@ -81,13 +80,11 @@ async fn check_position(lat: f64, lng: f64, game_id: String) -> String {
     if distance < 20.0 {
         let data = get_game_data(game_id);
         let time_taken = data.start_time.elapsed().ok().unwrap().as_secs();
-        let user = data.user_id;
+        let user = data.user_id.to_string();
         let start_pos = json::to_string(&data.coordinates[0]).unwrap();
         let end_pos = json::to_string(&data.coordinates[1]).unwrap();
-        let url = format!("https://docs.google.com/forms/d/e/1FAIpQLSdMCNxP4QEmAjuFwQYAZ678P19u08BN0lCvhJffeK4JH5XyYg/formResponse?submit=Submit&usp=pp_url&entry.910322073={user}&entry.1918876988={time_taken}&entry.1744420129={start_pos}&entry.209514963=test_end");
+        let url = format!("https://docs.google.com/forms/d/e/1FAIpQLSdMCNxP4QEmAjuFwQYAZ678P19u08BN0lCvhJffeK4JH5XyYg/formResponse?submit=Submit&usp=pp_url&entry.910322073={user}&entry.1918876988={time_taken}&entry.1744420129={start_pos}&entry.209514963={end_pos}");
         println!("{}", url);
-        let client = reqwest::Client::new();
-        //let resp = client.get(url).header(USER_AGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36").send().await.ok().unwrap();
         let resp = reqwest::get(url).await.ok().unwrap();
         if resp.status().is_success() {
             println!("success!");
