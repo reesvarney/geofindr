@@ -21,7 +21,8 @@ async function initMap() {
 // Initialises the game with the server
 async function initGame() {
   const max_distance = 1000;
-  const data = await (await fetch(`/start_game?max_distance=${max_distance}`)).json();
+  let user_id = "test";
+  const data = await (await fetch(`/start_game?user_id=${user_id}`)).json();
   game_id = data.gameId;
   console.log(data)
   return data.startPosition;
