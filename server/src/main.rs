@@ -1,18 +1,14 @@
 #[macro_use]
 extern crate rocket;
-#[macro_use]
-extern crate lazy_static;
 
 use rocket::fs::NamedFile;
 use rocket::serde::{json::Json, json, Deserialize, Serialize};
-use std::{collections::HashMap, fs::File, io::copy, path::Path, sync::Mutex};
+use std::{fs::File, io::copy, path::Path};
 use uuid::Uuid;
 use std::time::{SystemTime};
 
 // Hashmap to store list of all games
-lazy_static! {
-    static ref GAMES: Mutex<HashMap<String, GameData>> = Mutex::new(HashMap::new());
-}
+type Session<'a> = rocket_session::Session<'a, String>;
 
 // Coordinate struct, contains longitude and latitude of a position
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -22,7 +18,7 @@ struct Coordinates {
     lng: f64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 struct GameData {
     coordinates: [Coordinates; 2],
     start_time: SystemTime,
@@ -34,9 +30,7 @@ struct GameData {
 #[serde(crate = "rocket::serde")]
 struct GameStartResponse {
     #[serde(rename(serialize = "startPosition"))]
-    start_position: Coordinates,
-    #[serde(rename(serialize = "gameId"))]
-    game_id: String,
+    start_position: Coordinates
 }
 
 // TODO: Convert this into a large list of positions
@@ -53,32 +47,35 @@ const TEST_POSITIONS: [Coordinates; 2] = [
 
 // Initialise game data
 #[get("/start_game?<user_id>")]
-fn start_game(user_id: String) -> Json<GameStartResponse> {
-    let id = Uuid::new_v4().to_string();
+fn start_game(session: Session, user_id: String) -> Json<GameStartResponse> {
     // TODO: Get two random positions from list
     // For the first position, get random from list
     // For the second position, get random from list and then check if it is within the min/ max distance, if not - go to next item in list
     // Also make sure it is not the same coordinates as the first position
     let positions = TEST_POSITIONS;
-    let mut _games = GAMES.lock().expect("Error acquiring lock on GAMES");
     let data = GameData {
         coordinates: positions,
         start_time: SystemTime::now(),
         user_id: user_id,
     };
-    _games.insert(id.clone(), data);
+     session.tap(|n| {
+            *n = serde_json::to_string(&data).unwrap();
+        });
+
     return Json(GameStartResponse {
-        start_position: positions[0],
-        game_id: id,
+        start_position: positions[0]
     });
 }
 
 // Check position distance
-#[get("/check_position?<lat>&<lng>&<game_id>")]
-async fn check_position(lat: f64, lng: f64, game_id: String) -> String {
-    let distance: f64 = haversine_distance(Coordinates { lat, lng }, get_coordinates(game_id.clone()));
+#[get("/check_position?<lat>&<lng>")]
+async fn check_position(session: Session<'_>, lat: f64, lng: f64) -> String {
+    let data: GameData =  session.tap(|n| {
+        let x : GameData = serde_json::from_str(&n).unwrap();
+        return x;
+    });
+    let distance: f64 = haversine_distance(Coordinates { lat, lng }, data.coordinates[1]);
     if distance < 20.0 {
-        let data = get_game_data(game_id);
         let time_taken = data.start_time.elapsed().ok().expect("Error sending a time result").as_secs();
         let user = data.user_id.to_string();
         let start_pos = json::to_string(&data.coordinates[0]).expect("Error sending a start_pos result");
@@ -100,9 +97,12 @@ async fn check_position(lat: f64, lng: f64, game_id: String) -> String {
 
 
 // Get preview image for game
-#[get("/preview?<game_id>")]
-async fn preview(game_id: String) -> Option<NamedFile> {
-    let coordinates = get_coordinates(game_id);
+#[get("/preview")]
+async fn preview(session: Session<'_>) -> Option<NamedFile> {
+    let coordinates: Coordinates = session.tap(|n| {
+        let data: GameData = serde_json::from_str(&n).unwrap();
+        return data.coordinates[1];
+    });
     let lat = coordinates.lat;
     let lng = coordinates.lng;
     let image_path = format!("../images/{lat}_{lng}.jpeg");
@@ -111,22 +111,6 @@ async fn preview(game_id: String) -> Option<NamedFile> {
         download_file(&url, &image_path).await.ok();
     }
     return NamedFile::open(image_path).await.ok();
-}
-
-// Gets coordinates
-// The lock method is required and stops other parts of the code interacting with the variable
-// It only becomes "unlocked" at the end of its scope which is why it needs to be used through a separate function
-fn get_coordinates(game_id: String) -> Coordinates {
-    let mut _games = GAMES.lock().expect("Error locking coordinates into games list");
-    let lat = _games[&game_id].coordinates[1].lat.clone();
-    let lng = _games[&game_id].coordinates[1].lng.clone();
-    return Coordinates { lat, lng };
-}
-
-// Same but for all game data
-fn get_game_data(game_id: String) -> GameData {
-    let mut _games = GAMES.lock().expect("Error locking game id into games list");
-    return _games[&game_id].clone();
 }
 
 const MULT: f64 = 180.0 / std::f64::consts::PI;
@@ -153,6 +137,7 @@ async fn download_file(url: &String, location: &String) -> Result<(), Box<dyn st
 #[launch]
 fn rocket() -> _ {
     rocket::build()
+        .attach(Session::fairing())
         .mount("/", rocket::fs::FileServer::from("../client"))
         .mount("/", routes![start_game, preview, check_position])
 }
