@@ -1,11 +1,14 @@
 #[macro_use]
 extern crate rocket;
+extern crate rand;
 
-use rocket::fs::NamedFile;
+//use rocket::http::hyper::uri::Port;
 use rocket::serde::{json::Json, json, Deserialize, Serialize};
 use std::{fs::File, io::copy, path::Path};
-use uuid::Uuid;
 use std::time::{SystemTime};
+use rocket::fs::NamedFile;
+//use uuid::Uuid;
+use rand::Rng;
 
 // Hashmap to store list of all games
 type Session<'a> = rocket_session::Session<'a, String>;
@@ -34,25 +37,97 @@ struct GameStartResponse {
 }
 
 // TODO: Convert this into a large list of positions
-const TEST_POSITIONS: [Coordinates; 2] = [
+const PORT_COORDS: [Coordinates; 11] = [
     Coordinates {
         lat: 50.800022,
         lng: -1.095664,
     },
     Coordinates {
+        lat: 50.799807, 
+        lng: -1.095634,
+    },
+    Coordinates {
         lat: 50.797585,
         lng: -1.095735,
     },
+    Coordinates {
+        lat: 50.795546, 
+        lng: -1.091959,
+    },
+    Coordinates {
+        lat: 50.788019,
+        lng: -1.055693,
+    },
+    Coordinates {
+        lat: 50.809171, 
+        lng: -1.086770,
+    },
+    Coordinates {
+        lat: 50.823145, 
+        lng: -1.060117,
+    },
+    Coordinates {
+        lat: 50.781742, 
+        lng: -1.086038,
+    },
+    Coordinates {
+        lat: 50.784100,
+        lng: -1.078329,
+    },
+    Coordinates {
+        lat: 50.789016, 
+        lng: -1.085832
+    }, Coordinates {
+        lat: 50.794960, 
+        lng: -1.067656
+    }
 ];
+
+const MIN_DISTANCE: f64 = 500.0;
+const MAX_DISTANCE: f64 = 1000.0;
+
+fn get_random_position(positions: &[Coordinates]) -> Coordinates {
+    let random_index = rand::thread_rng().gen_range(0, positions.len() - 1);
+    positions[random_index]
+}
+
+/* 
+// check if two coordinates are within the distance range
+fn is_within_range(pos1: Coordinates, pos2: Coordinates) -> bool {
+    let distance = haversine_distance(pos1, pos2);
+    if distance < MIN_DISTANCE || distance > MAX_DISTANCE {
+        return false
+    } true
+}
+*/
 
 // Initialise game data
 #[get("/start_game?<user_id>")]
 fn start_game(session: Session, user_id: String) -> Json<GameStartResponse> {
-    // TODO: Get two random positions from list
-    // For the first position, get random from list
-    // For the second position, get random from list and then check if it is within the min/ max distance, if not - go to next item in list
-    // Also make sure it is not the same coordinates as the first position
-    let positions = TEST_POSITIONS;
+    let first_pos = get_random_position(&PORT_COORDS);
+    let mut second_pos = get_random_position(&PORT_COORDS);
+
+    // Ensure second position is not the same as the first
+    let mut index = rand::thread_rng().gen_range(0, PORT_COORDS.len());
+    let mut found = false;
+    let mut counter = 0;
+    while !found && counter < PORT_COORDS.len() {
+        let pos = PORT_COORDS[index];
+        let distance = haversine_distance(pos, first_pos) ;
+        print!("DISTANCE: \n{}", distance);
+        if (pos.lat != first_pos.lat && pos.lng != first_pos.lng) && (distance > MIN_DISTANCE && distance < MAX_DISTANCE) {
+            found = true;
+            second_pos = pos;
+            break;
+        }
+        if index < PORT_COORDS.len() - 1{
+            index += 1;
+        } else if index == PORT_COORDS.len() {
+            index = 0;
+        }
+        counter += 1;
+    }
+    let positions = [first_pos, second_pos];
     let data = GameData {
         coordinates: positions,
         start_time: SystemTime::now(),
@@ -63,7 +138,7 @@ fn start_game(session: Session, user_id: String) -> Json<GameStartResponse> {
         });
 
     return Json(GameStartResponse {
-        start_position: positions[0]
+        start_position: first_pos
     });
 }
 
