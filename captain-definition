@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "dockerfileLines": [
+                        "FROM ubuntu:latest",
+                        "ARG GH_TOKEN=${GH_TOKEN}",
+                        "RUN mkdir -p /geofindr",
+                        "WORKDIR /geofindr",
+                        "RUN apt-get update && apt-get upgrade -y",
+                        "RUN apt-get install -y wget curl jq systemctl unzip openssl  && rm -rf /var/lib/apt/lists/*",
+                        "ADD \"https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h\" skipcache",
+                        "RUN export RESPONSE=`curl -sL -H \"Authorization: Bearer $GH_TOKEN\" -H \"Accept: application/vnd.github.v3.raw\" https://api.github.com/repos/reesvarney/sprint2/releases`; export PARSER=\".[0].assets | map(select(.name == \\\"release.zip\\\"))[0].id\";export ASSET_ID=`echo \"$RESPONSE\" | jq \"$PARSER\"`; curl -sL -u \"reesvarney:$GH_TOKEN\" --header \"Accept: application/octet-stream\" https://api.github.com/repos/reesvarney/SPRINT2/releases/assets/$ASSET_ID > release.zip",
+                        "RUN unzip ./release.zip",
+                        "RUN cd ./build; mv * ../; cd ../",
+                        "RUN rm -rf ./build ./release.zip",
+                        "WORKDIR /geofindr/server",
+                        "ENV ROCKET_PORT=80",
+                        "ENV ROCKET_ADDRESS=0.0.0.0",
+                        "EXPOSE 80",
+                        "CMD [\"/geofindr/server/server\"]"
+                    ]
+ }
