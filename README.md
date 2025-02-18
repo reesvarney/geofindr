@@ -22,6 +22,3 @@ Additional tools: Various mapping, geolocation & Google APIs
 - To help players understand if they're getting closer or further away from the destination, a meters count is also shown on the left-side of the page, showing how far away is the player from the shown destination.
 - Points are awarded based on accuracy (i.e. amount of clicks on interactive map) as well as the time taken to reach a destination. This reinforces geographic awareness.
 - Over time, repeated play enhances familiarity with critical locations, aiding real-world navigation.
-
-🔒 Hosting & Security
-Previously hosted online, GeoFindr was temporarily taken down due to security considerations. Future iterations will focus on addressing these concerns while improving performance and accessibility.
